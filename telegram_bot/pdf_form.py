@@ -10,7 +10,7 @@ import re
 
 import pymupdf
 
-DEFAULT_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "assets" / "FQS-OPE-F001.pdf"
+DEFAULT_TEMPLATE_PATH = Path(__file__).resolve().parent / "assets" / "FQS-OPE-F001.pdf"
 
 PDF_FIELDS: tuple[tuple[str, str], ...] = (
     ("descripcion", "Descripción del problema"),
