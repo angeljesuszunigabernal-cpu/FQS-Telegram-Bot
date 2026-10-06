@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from pathlib import Path
 import pymupdf
 
-WEEKLY_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "assets" / "FQS-OPE-F008.pdf"
+WEEKLY_TEMPLATE_PATH = Path(__file__).resolve().parent / "assets" / "FQS-OPE-F008.pdf"
 WEEKLY_FIELDS = (
     ("fecha", "Fecha"),
     ("linea", "Línea de Ensamble"),
