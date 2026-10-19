@@ -254,8 +254,8 @@ def _completion_prompt(client: BotClient, chat_id: int | str, session: FormSessi
     if not session.report_name:
         _send(client, chat_id, "¿Qué nombre quieres darle a este reporte?", NAME_KEYBOARD)
     else:
-        code = "FQS-OPE-F008" if isinstance(session, WeeklySession) else "FQS-OPE-F001"
-        _send(client, chat_id, f"Nombre del archivo: {code}-completado-{session.report_name}.pdf\nToca «✅ Enviar reporte» para recibirlo.", SUMMARY_KEYBOARD)
+        base_name = "FQS-OPE-F008-completado" if isinstance(session, WeeklySession) else "FQS-OPE-001- Formato de Recolección Inicial de Información"
+        _send(client, chat_id, f"Nombre del archivo: {base_name} - {session.report_name}.pdf\nToca «✅ Enviar reporte» para recibirlo.", SUMMARY_KEYBOARD)
 
 
 def _safe_report_name(text: str) -> str:
@@ -280,6 +280,7 @@ def _deliver_report(
         return
     weekly = isinstance(session, WeeklySession)
     code = "FQS-OPE-F008" if weekly else "FQS-OPE-F001"
+    base_name = "FQS-OPE-F008-completado" if weekly else "FQS-OPE-001- Formato de Recolección Inicial de Información"
     photos = () if weekly else tuple(session.evidence_photos)
     answers = dict(session.answers)
     if not weekly:
@@ -291,7 +292,7 @@ def _deliver_report(
         content = (generate_weekly_pdf(answers) if weekly else
                    pdf_generator(answers, template_path, photos))
         client.send_document(
-            chat_id, f"{code}-completado-{session.report_name}.pdf", content,
+            chat_id, f"{base_name} - {session.report_name}.pdf", content,
             f"{code} · {session.report_name}",
         )
     except Exception:
