@@ -254,7 +254,7 @@ def _completion_prompt(client: BotClient, chat_id: int | str, session: FormSessi
     if not session.report_name:
         _send(client, chat_id, "¿Qué nombre quieres darle a este reporte?", NAME_KEYBOARD)
     else:
-        base_name = "FQS-OPE-F008-completado" if isinstance(session, WeeklySession) else "FQS-OPE-001- Formato de Recolección Inicial de Información"
+        base_name = "FQS-OPE-008- Reporte de trabajo semanal" if isinstance(session, WeeklySession) else "FQS-OPE-001- Formato de Recolección Inicial de Información"
         _send(client, chat_id, f"Nombre del archivo: {base_name} - {session.report_name}.pdf\nToca «✅ Enviar reporte» para recibirlo.", SUMMARY_KEYBOARD)
 
 
@@ -280,7 +280,7 @@ def _deliver_report(
         return
     weekly = isinstance(session, WeeklySession)
     code = "FQS-OPE-F008" if weekly else "FQS-OPE-F001"
-    base_name = "FQS-OPE-F008-completado" if weekly else "FQS-OPE-001- Formato de Recolección Inicial de Información"
+    base_name = "FQS-OPE-008- Reporte de trabajo semanal" if weekly else "FQS-OPE-001- Formato de Recolección Inicial de Información"
     photos = () if weekly else tuple(session.evidence_photos)
     answers = dict(session.answers)
     if not weekly:
