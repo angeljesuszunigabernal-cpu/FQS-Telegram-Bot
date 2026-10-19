@@ -12,6 +12,7 @@ from typing import Any, Protocol
 
 from telegram_bot.pdf_form import DEFAULT_TEMPLATE_PATH, PDF_FIELDS, generate_completed_pdf
 from telegram_bot.pdf_weekly import WEEKLY_FIELDS, WEEKLY_TEMPLATE_PATH, generate_weekly_pdf
+from telegram_bot.inspection_flow import InspectionSession, handle_inspection
 
 FIELD_QUESTIONS = {
     "descripcion": "Describe la no conformidad o desviación detectada.",
@@ -38,6 +39,7 @@ HELP_TEXT = (
     "Comandos disponibles:\n"
     "/nuevo — iniciar directamente FQS-OPE-F001\n"
     "/semanal — iniciar FQS-OPE-F008 (solo texto)\n"
+    "/inspeccion — iniciar FQS-OPE-F005 (Excel, solo datos)\n"
     "/cancelar — cancelar la captura actual\n"
     "/listo — terminar de enviar las fotografías del punto 12\n"
     "/confirmar — continuar o reintentar el envío del reporte\n"
@@ -68,6 +70,7 @@ REPORT_KEYBOARD = {
     "keyboard": [
         [{"text": "📄 FQS-OPE-F001"}],
         [{"text": "📅 FQS-OPE-F008"}],
+        [{"text": "📊 FQS-OPE-F005"}],
         [{"text": "↩️ Menú principal"}],
     ],
     "resize_keyboard": True,
@@ -142,7 +145,7 @@ class WeeklySession:
         pass
 
 
-SESSIONS: dict[int | str, FormSession | WeeklySession] = {}
+SESSIONS: dict[int | str, FormSession | WeeklySession | InspectionSession] = {}
 
 
 def _command(text: str) -> tuple[str, str]:
@@ -311,7 +314,7 @@ def handle_update(
     client: BotClient,
     update: dict[str, Any],
     *,
-    sessions: MutableMapping[int | str, FormSession | WeeklySession] | None = None,
+    sessions: MutableMapping[int | str, FormSession | WeeklySession | InspectionSession] | None = None,
     template_path: Path = DEFAULT_TEMPLATE_PATH,
     pdf_generator: PdfGenerator = generate_completed_pdf,
 ) -> None:
@@ -324,6 +327,8 @@ def handle_update(
         return
     chat_id = chat["id"]
     active_sessions = SESSIONS if sessions is None else sessions
+    if handle_inspection(client, chat_id, message, active_sessions, MAIN_KEYBOARD):
+        return
     session = active_sessions.get(chat_id)
     text = message.get("text")
 
@@ -451,7 +456,7 @@ def handle_update(
         _send(
             client,
             chat_id,
-            "Hola. Puedo ayudarte a completar los formatos FQS-OPE-F001 y FQS-OPE-F008. "
+            "Hola. Puedo ayudarte a completar FQS-OPE-F001 y FQS-OPE-F008 en PDF, y FQS-OPE-F005 en Excel. "
             "Toca «📝 Nuevo reporte» para elegir uno.",
             MAIN_KEYBOARD,
         )
@@ -543,4 +548,5 @@ def handle_update(
 
     session.awaiting_confirmation = True
     _send(client, chat_id, _summary(session), NAME_KEYBOARD)
+
 
