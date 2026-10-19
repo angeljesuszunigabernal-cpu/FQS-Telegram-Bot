@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import tempfile
 from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
@@ -39,7 +40,7 @@ HELP_TEXT = (
     "/semanal — iniciar FQS-OPE-F008 (solo texto)\n"
     "/cancelar — cancelar la captura actual\n"
     "/listo — terminar de enviar las fotografías del punto 12\n"
-    "/confirmar — generar el PDF después de revisar el resumen\n"
+    "/confirmar — continuar o reintentar el envío del reporte\n"
     "/ayuda — mostrar esta ayuda\n"
     "/ping — comprobar que el bot está activo"
 )
@@ -89,9 +90,15 @@ EVIDENCE_KEYBOARD = {
 }
 SUMMARY_KEYBOARD = {
     "keyboard": [
-        [{"text": "✅ Generar PDF"}],
+        [{"text": "✅ Enviar reporte"}],
         [{"text": "🔄 Empezar de nuevo"}, {"text": "❌ Cancelar reporte"}],
     ],
+    "resize_keyboard": True,
+}
+
+
+NAME_KEYBOARD = {
+    "keyboard": [[{"text": "❌ Cancelar reporte"}]],
     "resize_keyboard": True,
 }
 
@@ -108,6 +115,7 @@ class FormSession:
     answers: dict[str, str] = field(default_factory=dict)
     next_field: int = 0
     awaiting_confirmation: bool = False
+    report_name: str = ""
     evidence_photos: list[Path] = field(default_factory=list)
     _photo_temp_dir: tempfile.TemporaryDirectory | None = field(default=None, repr=False)
 
@@ -128,6 +136,7 @@ class WeeklySession:
     answers: dict[str, str] = field(default_factory=dict)
     next_field: int = 0
     awaiting_confirmation: bool = False
+    report_name: str = ""
 
     def cleanup(self) -> None:
         pass
@@ -166,7 +175,7 @@ def _summary(session: FormSession) -> str:
             f"Fotografías recibidas: {len(session.evidence_photos)}",
         )
     )
-    lines.extend(("", "¿Confirmas que genere el PDF? Responde /confirmar o /cancelar."))
+    lines.extend(("", "¿Qué nombre quieres darle a este reporte? Escríbelo para nombrar el archivo."))
     return "\n".join(lines)
 
 
@@ -180,23 +189,8 @@ def _weekly_summary(session: WeeklySession) -> str:
     lines = ["Resumen del FQS-OPE-F008:"]
     for number, (key, label) in enumerate(WEEKLY_FIELDS, start=1):
         lines.extend((f"{number}. {label}", session.answers.get(key, "")))
-    lines.extend(("", "¿Confirmas que genere el PDF?"))
+    lines.extend(("", "¿Qué nombre quieres darle a este reporte? Escríbelo para nombrar el archivo."))
     return "\n".join(lines)
-
-
-def _confirm_weekly(client: BotClient, chat_id: int | str, session: WeeklySession, sessions: MutableMapping[int | str, FormSession | WeeklySession]) -> None:
-    if not session.awaiting_confirmation:
-        _send(client, chat_id, "Completa primero todos los apartados del reporte semanal.", WEEKLY_KEYBOARD)
-        return
-    try:
-        content = generate_weekly_pdf(session.answers)
-        client.send_document(chat_id, "FQS-OPE-F008-completado.pdf", content, "FQS-OPE-F008 Reporte de trabajo semanal completado.")
-    except Exception as error:
-        logging.exception("No se pudo generar el FQS-OPE-F008.")
-        _send(client, chat_id, f"No pude generar el PDF: {error}. Tus respuestas siguen guardadas.", SUMMARY_KEYBOARD)
-        return
-    sessions.pop(chat_id, None)
-    _send(client, chat_id, "PDF semanal generado y enviado.", MAIN_KEYBOARD)
 
 
 def _receive_photo(
@@ -209,10 +203,7 @@ def _receive_photo(
         client.send_message(chat_id, "Envía /nuevo para iniciar el FQS-OPE-F001.")
         return
     if session.awaiting_confirmation:
-        client.send_message(
-            chat_id,
-            "El resumen ya está listo. Responde /confirmar o /cancelar.",
-        )
+        _completion_prompt(client, chat_id, session)
         return
     if session.next_field != len(PDF_FIELDS) - 1:
         client.send_message(
@@ -259,82 +250,66 @@ def _receive_photo(
     )
 
 
-def _confirm_pdf(
+def _completion_prompt(client: BotClient, chat_id: int | str, session: FormSession | WeeklySession) -> None:
+    if not session.report_name:
+        _send(client, chat_id, "¿Qué nombre quieres darle a este reporte?", NAME_KEYBOARD)
+    else:
+        _send(client, chat_id, f"Nombre del archivo: {session.report_name}.pdf\nToca «✅ Enviar reporte» para recibirlo.", SUMMARY_KEYBOARD)
+
+
+def _safe_report_name(text: str) -> str:
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f\x7f]', "_", text).strip()
+    name = re.sub(r"\.(?:xlsx|pdf)$", "", name, flags=re.IGNORECASE).strip(" .")
+    return name[:100].rstrip(" .")
+
+
+def _deliver_report(
     client: BotClient,
     chat_id: int | str,
-    session: FormSession,
-    sessions: MutableMapping[int | str, FormSession],
+    session: FormSession | WeeklySession,
+    sessions: MutableMapping[int | str, FormSession | WeeklySession],
     template_path: Path,
     pdf_generator: PdfGenerator,
 ) -> None:
     if not session.awaiting_confirmation:
-        if session.next_field == len(PDF_FIELDS) - 1:
-            response = (
-                "Primero envía una o varias fotografías y escribe /listo. "
-                "Puedes cancelar en cualquier momento con /cancelar."
-            )
-        else:
-            response = (
-                "Primero responde la pregunta actual. "
-                "Puedes cancelar en cualquier momento con /cancelar."
-            )
-        client.send_message(chat_id, response)
+        _send(client, chat_id, "Completa primero las preguntas del reporte.")
         return
-
-    try:
-        pdf_answers = dict(session.answers)
-        pdf_answers["evidencia"] = (
-            f"Fotografías adjuntas: {len(session.evidence_photos)}. "
+    if not session.report_name:
+        _completion_prompt(client, chat_id, session)
+        return
+    weekly = isinstance(session, WeeklySession)
+    code = "FQS-OPE-F008" if weekly else "FQS-OPE-F001"
+    photos = () if weekly else tuple(session.evidence_photos)
+    answers = dict(session.answers)
+    if not weekly:
+        answers["evidencia"] = (
+            f"Fotografías adjuntas: {len(photos)}. "
             "Consultar las páginas adicionales de evidencia."
         )
-        pdf_content = pdf_generator(
-            pdf_answers,
-            template_path,
-            tuple(session.evidence_photos),
-        )
+    try:
+        content = (generate_weekly_pdf(answers) if weekly else
+                   pdf_generator(answers, template_path, photos))
         client.send_document(
-            chat_id,
-            "FQS-OPE-F001-completado.pdf",
-            pdf_content,
-            (
-                f"FQS-OPE-F001 completado con {len(session.evidence_photos)} fotografías "
-                "de evidencia."
-            ),
+            chat_id, f"{session.report_name}.pdf", content,
+            f"{code} · {session.report_name}",
         )
-    except ValueError as error:
-        logging.warning("No se pudo preparar el PDF FQS-OPE-F001: %s", error)
-        client.send_message(
-            chat_id,
-            f"No pude preparar el PDF: {error} "
-            "Tus respuestas y fotografías siguen guardadas. "
-            "Envía /confirmar para reintentar, /nuevo para iniciar otra captura "
-            "o /cancelar para salir.",
-        )
-        return
     except Exception:
-        logging.exception("No se pudo generar o enviar el PDF FQS-OPE-F001.")
-        client.send_message(
-            chat_id,
-            "No pude generar o enviar el PDF. Tus respuestas y fotografías siguen guardadas; "
-            "envía /confirmar para reintentar o /cancelar para salir.",
-        )
+        logging.exception("No se pudo generar o enviar el reporte %s.", code)
+        _send(client, chat_id,
+              "No pude completar el envío. Tus respuestas y fotografías siguen guardadas. "
+              "Envía /confirmar para reintentar el PDF o /cancelar para salir.",
+              SUMMARY_KEYBOARD)
         return
-
     sessions.pop(chat_id, None)
     session.cleanup()
-    _send(
-        client,
-        chat_id,
-        "PDF generado y enviado. Las fotografías están en páginas adicionales de evidencia.",
-        MAIN_KEYBOARD,
-    )
+    _send(client, chat_id, "PDF generado y enviado con el nombre que elegiste.", MAIN_KEYBOARD)
 
 
 def handle_update(
     client: BotClient,
     update: dict[str, Any],
     *,
-    sessions: MutableMapping[int | str, FormSession] | None = None,
+    sessions: MutableMapping[int | str, FormSession | WeeklySession] | None = None,
     template_path: Path = DEFAULT_TEMPLATE_PATH,
     pdf_generator: PdfGenerator = generate_completed_pdf,
 ) -> None:
@@ -383,8 +358,9 @@ def handle_update(
         "ℹ️ Ayuda": "/ayuda",
         "❌ Cancelar reporte": "/cancelar",
         "✅ Terminar fotos": "/listo",
+        "✅ Enviar reporte": "/confirmar",
         "✅ Generar PDF": "/confirmar",
-        "🔄 Empezar de nuevo": "/nuevo",
+        "🔄 Empezar de nuevo": "/semanal" if isinstance(session, WeeklySession) else "/nuevo",
     }
     if button_text in button_commands:
         text = button_commands[button_text]
@@ -404,17 +380,16 @@ def handle_update(
             client.send_message(chat_id, "No hay un formulario activo para cancelar.")
         else:
             cancelled_session.cleanup()
-            _send(client, chat_id, "Formulario cancelado. No se generó ningún PDF.", MAIN_KEYBOARD)
+            _send(client, chat_id, "Formulario cancelado. Se cerró la captura.", MAIN_KEYBOARD)
         return
 
     if command == "/listo":
         if session is None:
             client.send_message(chat_id, "No hay un formulario activo. Envía /nuevo para comenzar.")
+        elif isinstance(session, WeeklySession):
+            _send(client, chat_id, "Responde los apartados del reporte semanal.", WEEKLY_KEYBOARD)
         elif session.awaiting_confirmation:
-            client.send_message(
-                chat_id,
-                "El resumen ya está listo. Responde /confirmar o /cancelar.",
-            )
+            _completion_prompt(client, chat_id, session)
         elif session.next_field != len(PDF_FIELDS) - 1:
             client.send_message(
                 chat_id,
@@ -427,7 +402,7 @@ def handle_update(
             )
         else:
             session.awaiting_confirmation = True
-            _send(client, chat_id, _summary(session), SUMMARY_KEYBOARD)
+            _send(client, chat_id, _summary(session), NAME_KEYBOARD)
         return
 
     if command == "/elegir":
@@ -485,16 +460,13 @@ def handle_update(
         return
 
     if command == "/confirmar":
-        if isinstance(session, WeeklySession):
-            _confirm_weekly(client, chat_id, session, active_sessions)
-            return
         if session is None:
             client.send_message(
                 chat_id,
                 "No hay un formulario pendiente. Envía /nuevo para comenzar.",
             )
             return
-        _confirm_pdf(
+        _deliver_report(
             client,
             chat_id,
             session,
@@ -515,10 +487,19 @@ def handle_update(
         _send(client, chat_id, "Toca «📝 Nuevo reporte» para elegir el formato que deseas completar (o usa /nuevo para FQS-OPE-F001).", MAIN_KEYBOARD)
         return
 
+    if session.awaiting_confirmation:
+        if not session.report_name:
+            name = _safe_report_name(text.strip())
+            if not name:
+                _send(client, chat_id, "Escribe un nombre válido para tu reporte.", NAME_KEYBOARD)
+                return
+            session.report_name = name
+            _completion_prompt(client, chat_id, session)
+        else:
+            _completion_prompt(client, chat_id, session)
+        return
+
     if isinstance(session, WeeklySession):
-        if session.awaiting_confirmation:
-            _send(client, chat_id, "Revisa el resumen y toca «✅ Generar PDF» o «❌ Cancelar reporte».", SUMMARY_KEYBOARD)
-            return
         answer = text.strip()
         if not answer:
             _send(client, chat_id, "La respuesta no puede estar vacía. Usa «⏭️ No aplica» si corresponde.", WEEKLY_KEYBOARD)
@@ -530,14 +511,7 @@ def handle_update(
             _send(client, chat_id, _weekly_question(session), WEEKLY_KEYBOARD)
         else:
             session.awaiting_confirmation = True
-            _send(client, chat_id, _weekly_summary(session), SUMMARY_KEYBOARD)
-        return
-
-    if session.awaiting_confirmation:
-        client.send_message(
-            chat_id,
-            "Revisa el resumen y responde /confirmar para generar el PDF o /cancelar para salir.",
-        )
+            _send(client, chat_id, _weekly_summary(session), NAME_KEYBOARD)
         return
 
     if session.next_field == len(PDF_FIELDS) - 1:
@@ -566,4 +540,5 @@ def handle_update(
         return
 
     session.awaiting_confirmation = True
-    _send(client, chat_id, _summary(session), SUMMARY_KEYBOARD)
+    _send(client, chat_id, _summary(session), NAME_KEYBOARD)
+
