@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 import uuid
 from pathlib import Path
 from typing import Any
@@ -118,6 +119,7 @@ class TelegramClient:
         caption: str,
     ) -> None:
         boundary = f"----TelegramBot{uuid.uuid4().hex}"
+        content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
         parts = [
             f"--{boundary}\r\n"
             'Content-Disposition: form-data; name="chat_id"\r\n\r\n'
@@ -127,7 +129,7 @@ class TelegramClient:
             f"{caption}\r\n",
             f"--{boundary}\r\n"
             f'Content-Disposition: form-data; name="document"; filename="{filename}"\r\n'
-            "Content-Type: application/pdf\r\n\r\n",
+            f"Content-Type: {content_type}\r\n\r\n",
         ]
         body = (
             "".join(parts).encode("utf-8")
@@ -146,12 +148,12 @@ class TelegramClient:
                 result = json.loads(response.read().decode("utf-8"))
         except HTTPError as error:
             raise TelegramAPIError(
-                f"Telegram devolvió el estado HTTP {error.code} al enviar el PDF."
+                f"Telegram devolvió el estado HTTP {error.code} al enviar el archivo."
             ) from None
         except (URLError, TimeoutError, OSError):
-            raise TelegramAPIError("No se pudo conectar con Telegram para enviar el PDF.") from None
+            raise TelegramAPIError("No se pudo conectar con Telegram para enviar el archivo.") from None
         except (UnicodeDecodeError, json.JSONDecodeError):
-            raise TelegramAPIError("Telegram devolvió una respuesta no válida al enviar el PDF.") from None
+            raise TelegramAPIError("Telegram devolvió una respuesta no válida al enviar el archivo.") from None
 
         if not isinstance(result, dict) or not result.get("ok"):
             description = (
@@ -159,4 +161,5 @@ class TelegramClient:
                 if isinstance(result, dict)
                 else "respuesta no válida"
             )
-            raise TelegramAPIError(f"Telegram no pudo enviar el PDF: {description}")
+            raise TelegramAPIError(f"Telegram no pudo enviar el archivo: {description}")
+
