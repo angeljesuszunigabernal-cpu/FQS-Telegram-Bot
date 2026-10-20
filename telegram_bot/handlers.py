@@ -13,6 +13,7 @@ from typing import Any, Protocol
 from telegram_bot.pdf_form import DEFAULT_TEMPLATE_PATH, PDF_FIELDS, generate_completed_pdf
 from telegram_bot.pdf_weekly import WEEKLY_FIELDS, WEEKLY_TEMPLATE_PATH, generate_weekly_pdf
 from telegram_bot.inspection_flow import InspectionSession, handle_inspection
+from telegram_bot.method_flow import MethodSession, handle_method
 
 FIELD_QUESTIONS = {
     "descripcion": "Describe la no conformidad o desviación detectada.",
@@ -40,6 +41,7 @@ HELP_TEXT = (
     "/nuevo — iniciar directamente FQS-OPE-F001\n"
     "/semanal — iniciar FQS-OPE-F008 (solo texto)\n"
     "/inspeccion — iniciar FQS-OPE-F005 (Excel, solo datos)\n"
+    "/metodo — iniciar FQS-OPE-F009 (Excel, con fotos por paso)\n"
     "/cancelar — cancelar la captura actual\n"
     "/listo — terminar de enviar las fotografías del punto 12\n"
     "/confirmar — continuar o reintentar el envío del reporte\n"
@@ -71,6 +73,7 @@ REPORT_KEYBOARD = {
         [{"text": "📄 FQS-OPE-F001"}],
         [{"text": "📅 FQS-OPE-F008"}],
         [{"text": "📊 FQS-OPE-F005"}],
+        [{"text": "🔎 FQS-OPE-F009"}],
         [{"text": "↩️ Menú principal"}],
     ],
     "resize_keyboard": True,
@@ -145,7 +148,7 @@ class WeeklySession:
         pass
 
 
-SESSIONS: dict[int | str, FormSession | WeeklySession | InspectionSession] = {}
+SESSIONS: dict[int | str, FormSession | WeeklySession | InspectionSession | MethodSession] = {}
 
 
 def _command(text: str) -> tuple[str, str]:
@@ -314,7 +317,7 @@ def handle_update(
     client: BotClient,
     update: dict[str, Any],
     *,
-    sessions: MutableMapping[int | str, FormSession | WeeklySession | InspectionSession] | None = None,
+    sessions: MutableMapping[int | str, FormSession | WeeklySession | InspectionSession | MethodSession] | None = None,
     template_path: Path = DEFAULT_TEMPLATE_PATH,
     pdf_generator: PdfGenerator = generate_completed_pdf,
 ) -> None:
@@ -327,6 +330,8 @@ def handle_update(
         return
     chat_id = chat["id"]
     active_sessions = SESSIONS if sessions is None else sessions
+    if handle_method(client, chat_id, message, active_sessions, MAIN_KEYBOARD):
+        return
     if handle_inspection(client, chat_id, message, active_sessions, MAIN_KEYBOARD):
         return
     session = active_sessions.get(chat_id)
@@ -456,7 +461,7 @@ def handle_update(
         _send(
             client,
             chat_id,
-            "Hola. Puedo ayudarte a completar FQS-OPE-F001 y FQS-OPE-F008 en PDF, y FQS-OPE-F005 en Excel. "
+            "Hola. Puedo ayudarte a completar FQS-OPE-F001 y FQS-OPE-F008 en PDF, y FQS-OPE-F005 y FQS-OPE-F009 en Excel. "
             "Toca «📝 Nuevo reporte» para elegir uno.",
             MAIN_KEYBOARD,
         )
