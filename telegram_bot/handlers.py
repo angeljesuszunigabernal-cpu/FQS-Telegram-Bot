@@ -15,6 +15,10 @@ from telegram_bot.pdf_weekly import WEEKLY_FIELDS, WEEKLY_TEMPLATE_PATH, generat
 from telegram_bot.inspection_flow import InspectionSession, handle_inspection
 from telegram_bot.method_flow import MethodSession, handle_method
 from telegram_bot.magna_flow import MagnaSession, handle_magna
+from telegram_bot import inspection_flow, method_flow, magna_flow
+from telegram_bot.corrections import handle_correction
+from telegram_bot.excel_inspection import INSPECTION_FIELDS
+from telegram_bot.excel_method import METHOD_FIELDS
 
 FIELD_QUESTIONS = {
     "descripcion": "Describe la no conformidad o desviación detectada.",
@@ -44,6 +48,7 @@ HELP_TEXT = (
     "/inspeccion — iniciar FQS-OPE-F005 (Excel, solo datos)\n"
     "/metodo — iniciar FQS-OPE-F009 (Excel, con fotos por paso)\n"
     "/magna — reporte semanal MAGNA en Word, día por día\n"
+    "/corregir — cambiar una respuesta o fotografía sin reiniciar\n"
     "/cancelar — cancelar la captura actual\n"
     "/listo — terminar de enviar las fotografías del punto 12\n"
     "/confirmar — continuar o reintentar el envío del reporte\n"
@@ -81,35 +86,27 @@ REPORT_KEYBOARD = {
     ],
     "resize_keyboard": True,
 }
-WEEKLY_KEYBOARD = {
-    "keyboard": [[{"text": "⏭️ No aplica"}], [{"text": "❌ Cancelar reporte"}]],
-    "resize_keyboard": True,
-}
+WEEKLY_KEYBOARD = {'keyboard': [[{'text': '⏭️ No aplica'}],
+              [{'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
 
-FORM_KEYBOARD = {
-    "keyboard": [[{"text": "⏭️ No aplica"}], [{"text": "❌ Cancelar reporte"}]],
-    "resize_keyboard": True,
-}
-EVIDENCE_KEYBOARD = {
-    "keyboard": [
-        [{"text": "📷 Agregar otra foto"}, {"text": "✅ Terminar fotos"}],
-        [{"text": "❌ Cancelar reporte"}],
-    ],
-    "resize_keyboard": True,
-}
-SUMMARY_KEYBOARD = {
-    "keyboard": [
-        [{"text": "✅ Enviar reporte"}],
-        [{"text": "🔄 Empezar de nuevo"}, {"text": "❌ Cancelar reporte"}],
-    ],
-    "resize_keyboard": True,
-}
+FORM_KEYBOARD = {'keyboard': [[{'text': '⏭️ No aplica'}],
+              [{'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
+EVIDENCE_KEYBOARD = {'keyboard': [[{'text': '📷 Agregar otra foto'}, {'text': '✅ Terminar fotos'}],
+              [{'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
+SUMMARY_KEYBOARD = {'keyboard': [[{'text': '✅ Enviar reporte'}],
+              [{'text': '🔄 Empezar de nuevo'}, {'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
 
 
-NAME_KEYBOARD = {
-    "keyboard": [[{"text": "❌ Cancelar reporte"}]],
-    "resize_keyboard": True,
-}
+NAME_KEYBOARD = {'keyboard': [[{'text': '❌ Cancelar reporte'}], [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
 
 
 def _send(client: BotClient, chat_id: int | str, text: str, keyboard: dict[str, Any] | None = None) -> None:
@@ -316,6 +313,41 @@ def _deliver_report(
     _send(client, chat_id, "PDF generado y enviado con el nombre que elegiste.", MAIN_KEYBOARD)
 
 
+def _resume_after_correction(client, chat_id, session):
+    if isinstance(session, MagnaSession):
+        if session.awaiting_confirmation:
+            client.send_message(chat_id, magna_flow._summary(session))
+        magna_flow._prompt(client, chat_id, session)
+    elif isinstance(session, MethodSession):
+        if session.awaiting_confirmation:
+            lines = ["Resumen actualizado del FQS-OPE-F009:"]
+            lines.extend(f"{label}: {session.answers[key]}" for key, label in METHOD_FIELDS)
+            lines.extend(f"Paso {index}: {description} (foto recibida)" for index, (description, _) in enumerate(session.steps, 1))
+            client.send_message(chat_id, "\n".join(lines))
+        method_flow._prompt(client, chat_id, session)
+    elif isinstance(session, InspectionSession):
+        if session.awaiting_confirmation:
+            lines = ["Resumen actualizado del FQS-OPE-F005:"]
+            lines.extend(f"{label}: {session.answers[key]}" for key, label in INSPECTION_FIELDS)
+            client.send_message(chat_id, "\n".join(lines))
+            inspection_flow._prompt(client, chat_id, session)
+        else:
+            _send(client, chat_id, inspection_flow._question(session), inspection_flow.INPUT_KEYBOARD)
+    elif isinstance(session, WeeklySession):
+        if session.awaiting_confirmation:
+            _send(client, chat_id, _weekly_summary(session))
+            _completion_prompt(client, chat_id, session)
+        else:
+            _send(client, chat_id, _weekly_question(session), WEEKLY_KEYBOARD)
+    elif isinstance(session, FormSession):
+        if session.awaiting_confirmation:
+            _send(client, chat_id, _summary(session))
+            _completion_prompt(client, chat_id, session)
+        else:
+            keyboard = EVIDENCE_KEYBOARD if session.next_field == len(PDF_FIELDS) - 1 else FORM_KEYBOARD
+            _send(client, chat_id, _question(session), keyboard)
+
+
 def handle_update(
     client: BotClient,
     update: dict[str, Any],
@@ -333,6 +365,8 @@ def handle_update(
         return
     chat_id = chat["id"]
     active_sessions = SESSIONS if sessions is None else sessions
+    if handle_correction(client, chat_id, message, active_sessions, _resume_after_correction):
+        return
     if handle_magna(client, chat_id, message, active_sessions, MAIN_KEYBOARD):
         return
     if handle_method(client, chat_id, message, active_sessions, MAIN_KEYBOARD):

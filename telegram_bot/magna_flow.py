@@ -7,9 +7,17 @@ from dataclasses import dataclass, field
 
 from telegram_bot.word_magna import MAGNA_AREAS, MAGNA_DAYS, MAGNA_FIELDS, generate_magna_word, magna_filename, validate_magna_answer
 
-INPUT_KEYBOARD = {"keyboard": [[{"text": "No aplica"}], [{"text": "⬅️ Anterior"}, {"text": "❌ Cancelar reporte"}]], "resize_keyboard": True}
-DATE_KEYBOARD = {"keyboard": [[{"text": "❌ Cancelar reporte"}]], "resize_keyboard": True}
-CONFIRM_KEYBOARD = {"keyboard": [[{"text": "✅ Enviar reporte"}], [{"text": "⬅️ Anterior"}, {"text": "🔄 Empezar de nuevo"}], [{"text": "❌ Cancelar reporte"}]], "resize_keyboard": True}
+INPUT_KEYBOARD = {'keyboard': [[{'text': 'No aplica'}],
+              [{'text': '⬅️ Anterior'}, {'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
+DATE_KEYBOARD = {'keyboard': [[{'text': '❌ Cancelar reporte'}], [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
+CONFIRM_KEYBOARD = {'keyboard': [[{'text': '✅ Enviar reporte'}],
+              [{'text': '⬅️ Anterior'}, {'text': '🔄 Empezar de nuevo'}],
+              [{'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
 
 
 @dataclass

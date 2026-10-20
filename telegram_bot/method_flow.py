@@ -10,12 +10,28 @@ from pathlib import Path
 
 from telegram_bot.excel_method import EPP_FIELDS, METHOD_BASE_NAME, METHOD_FIELDS, generate_method_excel, image_info, validate_method_answer
 
-INPUT_KEYBOARD = {"keyboard": [[{"text": "⏭️ No aplica"}], [{"text": "❌ Cancelar reporte"}]], "resize_keyboard": True}
-YES_NO_KEYBOARD = {"keyboard": [[{"text": "✅ Sí"}, {"text": "❌ No"}], [{"text": "❌ Cancelar reporte"}]], "resize_keyboard": True}
-PHOTO_KEYBOARD = {"keyboard": [[{"text": "✅ Terminar pasos"}], [{"text": "❌ Cancelar reporte"}]], "resize_keyboard": True}
-NEXT_KEYBOARD = {"keyboard": [[{"text": "➕ Agregar paso"}, {"text": "✅ Terminar pasos"}], [{"text": "❌ Cancelar reporte"}]], "resize_keyboard": True}
-NAME_KEYBOARD = {"keyboard": [[{"text": "❌ Cancelar reporte"}]], "resize_keyboard": True}
-CONFIRM_KEYBOARD = {"keyboard": [[{"text": "✅ Enviar reporte"}], [{"text": "🔄 Empezar de nuevo"}, {"text": "❌ Cancelar reporte"}]], "resize_keyboard": True}
+INPUT_KEYBOARD = {'keyboard': [[{'text': '⏭️ No aplica'}],
+              [{'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
+YES_NO_KEYBOARD = {'keyboard': [[{'text': '✅ Sí'}, {'text': '❌ No'}],
+              [{'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
+PHOTO_KEYBOARD = {'keyboard': [[{'text': '✅ Terminar pasos'}],
+              [{'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
+NEXT_KEYBOARD = {'keyboard': [[{'text': '➕ Agregar paso'}, {'text': '✅ Terminar pasos'}],
+              [{'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
+NAME_KEYBOARD = {'keyboard': [[{'text': '❌ Cancelar reporte'}], [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
+CONFIRM_KEYBOARD = {'keyboard': [[{'text': '✅ Enviar reporte'}],
+              [{'text': '🔄 Empezar de nuevo'}, {'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
 
 
 @dataclass

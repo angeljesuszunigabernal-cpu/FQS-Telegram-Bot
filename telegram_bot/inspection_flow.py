@@ -10,9 +10,16 @@ from telegram_bot.excel_inspection import (
     INSPECTION_BASE_NAME, INSPECTION_FIELDS, generate_inspection_excel, validate_answer,
 )
 
-INPUT_KEYBOARD = {"keyboard": [[{"text": "⏭️ No aplica"}], [{"text": "❌ Cancelar reporte"}]], "resize_keyboard": True}
-NAME_KEYBOARD = {"keyboard": [[{"text": "❌ Cancelar reporte"}]], "resize_keyboard": True}
-CONFIRM_KEYBOARD = {"keyboard": [[{"text": "✅ Enviar reporte"}], [{"text": "🔄 Empezar de nuevo"}, {"text": "❌ Cancelar reporte"}]], "resize_keyboard": True}
+INPUT_KEYBOARD = {'keyboard': [[{'text': '⏭️ No aplica'}],
+              [{'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
+NAME_KEYBOARD = {'keyboard': [[{'text': '❌ Cancelar reporte'}], [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
+CONFIRM_KEYBOARD = {'keyboard': [[{'text': '✅ Enviar reporte'}],
+              [{'text': '🔄 Empezar de nuevo'}, {'text': '❌ Cancelar reporte'}],
+              [{'text': '✏️ Corregir respuesta'}]],
+ 'resize_keyboard': True}
 
 
 @dataclass
