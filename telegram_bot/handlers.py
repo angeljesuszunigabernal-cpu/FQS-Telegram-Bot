@@ -73,9 +73,9 @@ MAIN_KEYBOARD = {
 REPORT_KEYBOARD = {
     "keyboard": [
         [{"text": "📄 FQS-OPE-F001"}],
-        [{"text": "TK-EPS"}],
         [{"text": "📊 FQS-OPE-F005"}],
         [{"text": "🔎 FQS-OPE-F009"}],
+        [{"text": "TK-EPS"}],
         [{"text": "MAGNA"}],
         [{"text": "↩️ Menú principal"}],
     ],
