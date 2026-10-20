@@ -73,7 +73,7 @@ MAIN_KEYBOARD = {
 REPORT_KEYBOARD = {
     "keyboard": [
         [{"text": "📄 FQS-OPE-F001"}],
-        [{"text": "📅 FQS-OPE-F008"}],
+        [{"text": "TK-EPS"}],
         [{"text": "📊 FQS-OPE-F005"}],
         [{"text": "🔎 FQS-OPE-F009"}],
         [{"text": "MAGNA"}],
@@ -371,6 +371,7 @@ def handle_update(
         "📝 Nuevo reporte": "/elegir",
         "📄 FQS-OPE-F001": "/nuevo",
         "📅 FQS-OPE-F008": "/semanal",
+        "TK-EPS": "/semanal",
         "↩️ Menú principal": "/start",
         "ℹ️ Ayuda": "/ayuda",
         "❌ Cancelar reporte": "/cancelar",

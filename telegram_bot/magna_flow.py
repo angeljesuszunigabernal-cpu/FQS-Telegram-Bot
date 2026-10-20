@@ -64,7 +64,7 @@ def handle_magna(client, chat_id, message, sessions, main_keyboard) -> bool:
         return True
     if not isinstance(session, MagnaSession):
         return False
-    if command in ("/nuevo", "/semanal", "/inspeccion", "/f005", "/metodo", "/f009", "/start", "/elegir", "/ayuda", "/help", "/ping") or text in ("📄 FQS-OPE-F001", "📅 FQS-OPE-F008", "📊 FQS-OPE-F005", "🔎 FQS-OPE-F009", "📝 Nuevo reporte", "↩️ Menú principal", "ℹ️ Ayuda"):
+    if command in ("/nuevo", "/semanal", "/inspeccion", "/f005", "/metodo", "/f009", "/start", "/elegir", "/ayuda", "/help", "/ping") or text in ("📄 FQS-OPE-F001", "📅 FQS-OPE-F008", "TK-EPS", "📊 FQS-OPE-F005", "🔎 FQS-OPE-F009", "📝 Nuevo reporte", "↩️ Menú principal", "ℹ️ Ayuda"):
         return False
     if command == "/cancelar" or text == "❌ Cancelar reporte":
         sessions.pop(chat_id, None)

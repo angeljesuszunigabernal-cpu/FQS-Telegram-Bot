@@ -56,7 +56,7 @@ def handle_inspection(client, chat_id, message, sessions, main_keyboard) -> bool
         return True
     if not isinstance(session, InspectionSession):
         return False
-    if command in ("/nuevo", "/semanal", "/start", "/elegir", "/ayuda", "/help", "/ping") or text in ("📄 FQS-OPE-F001", "📅 FQS-OPE-F008", "📝 Nuevo reporte", "↩️ Menú principal", "ℹ️ Ayuda"):
+    if command in ("/nuevo", "/semanal", "/start", "/elegir", "/ayuda", "/help", "/ping") or text in ("📄 FQS-OPE-F001", "📅 FQS-OPE-F008", "TK-EPS", "📝 Nuevo reporte", "↩️ Menú principal", "ℹ️ Ayuda"):
         return False
     if command == "/cancelar" or text == "❌ Cancelar reporte":
         sessions.pop(chat_id, None)
